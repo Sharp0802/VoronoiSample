@@ -1,0 +1,111 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Interactivity;
+using Avalonia.Skia;
+using Avalonia.Media;
+using Avalonia.Platform;
+using Avalonia.Media.Imaging;
+using NetTopologySuite;
+using NetTopologySuite.Geometries;
+using NetTopologySuite.Triangulate;
+using SkiaSharp;
+using System;
+using System.Linq;
+
+using GeometryCollection = NetTopologySuite.Geometries.GeometryCollection;
+
+namespace Procedural;
+
+public partial class MainWindow : Window
+{
+    public MainWindow()
+    {
+        InitializeComponent();
+    }
+
+    private int _width = 2048;
+    private int _height = 2048;
+    private int _pcnt = 2000;
+
+    private Random _rng = new Random(unchecked((int) DateTime.Now.Ticks));
+
+    public double Rand(double min, double max)
+    {
+        return min + _rng.NextDouble() * (max - min);
+    }
+
+    public void OnRegenerating(object sender, RoutedEventArgs e)
+    {
+        RegenUI.Content = "Generating...";
+        var starts = DateTime.Now;
+
+        var ui = CanvasUI;
+
+        var target = new WriteableBitmap(
+            new PixelSize(_width, _height), 
+            new Vector(96, 96), 
+            PixelFormat.Rgba8888);
+        using (var locked = target.Lock())
+        {
+            var info = new SKImageInfo(
+                locked.Size.Width,
+                locked.Size.Height,
+                locked.Format.ToSkColorType(),
+                SKAlphaType.Premul);
+            using (var surface = SKSurface.Create(info, locked.Address, locked.RowBytes))
+            {
+                var canvas = surface.Canvas;
+                canvas.Clear(new SKColor(0, 0, 0));
+                Generate(canvas);
+            }
+        }
+
+        ui.Source = target;
+
+        var elapsed = DateTime.Now - starts;
+        RegenUI.Content = $"Generated. {elapsed.TotalMilliseconds}ms taken.";
+    }
+
+    public void Generate(SKCanvas canvas)
+    {
+        var magenta = new SKPaint();
+        magenta.Color = new SKColor(255, 0, 0);
+        var green = new SKPaint();
+        green.Color = new SKColor(0, 255, 0);
+
+        var vertices = new Coordinate[_pcnt];
+        for (var i = 0; i < _pcnt; ++i)
+            vertices[i] = new Coordinate(Rand(0, _width), Rand(0, _height));
+        vertices = Relaxtion(vertices, 5);
+        foreach (var cell in Voronoi(vertices))
+        {
+            var centroid = cell.Centroid.Coordinate;
+            canvas.DrawCircle((float) centroid.X, (float) centroid.Y, 2f, magenta);
+            var pts = cell.Coordinates;
+            for (var i = 0; i < pts.Length; ++i)
+                canvas.DrawLine(
+                    (float) pts[i].X, 
+                    (float) pts[i].Y, 
+                    (float) pts[(i + 1) % pts.Length].X, 
+                    (float) pts[(i + 1) % pts.Length].Y, green);
+        }
+    }
+
+    public GeometryCollection Voronoi(Coordinate[] pts)
+    {
+        var builder = new VoronoiDiagramBuilder();
+        builder.ClipEnvelope = new Envelope(new Coordinate(0, 0), new Coordinate(_width, _height));
+        builder.Tolerance = 0.01;
+        builder.SetSites(pts);
+        return builder.GetDiagram(GeometryFactory.Default);
+    }
+
+    public Coordinate[] Relaxtion(Coordinate[] pts, int iteration)
+    {
+        for (var i = 0; i < iteration; ++i)
+            pts = Voronoi(pts).Select(c => c.Centroid.Coordinate).ToArray();
+        return pts;
+    }
+
+    public void OnQuit(object sender, RoutedEventArgs e) => Close();
+}
