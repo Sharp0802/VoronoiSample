@@ -11,6 +11,7 @@ using NetTopologySuite.Triangulate;
 using SkiaSharp;
 using System;
 using System.Linq;
+using System.Buffers;
 
 using GeometryCollection = NetTopologySuite.Geometries.GeometryCollection;
 
@@ -18,6 +19,8 @@ namespace Procedural;
 
 public partial class MainWindow : Window
 {
+    public const string EncodedNoise = "IgAzMwtBAAAAACEAEwBvEoM7GQANAAUAAABSuN4/CQAAexQuPwAAAAAAASEAJAADAAAAGwAFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgL///wAAAJqZmT4bAP//BwAAuB4FPgDNzMw+";
+
     public MainWindow()
     {
         InitializeComponent();
@@ -25,9 +28,21 @@ public partial class MainWindow : Window
 
     private int _width = 2048;
     private int _height = 2048;
-    private int _pcnt = 2000;
+
+    private float Frequency => (float)FreqUI.Value;
+    private int PointCount => (int)CntUI.Value;
+    private int IterationCount => (int)IterUI.Value;
+    private float NoiseMin => (float)MinUI.Value;
+    private float NoiseMax => (float)MaxUI.Value;
+    private float SeaLevel => (float)SeaUI.Value;
 
     private Random _rng = new Random(unchecked((int) DateTime.Now.Ticks));
+
+    public float Lerp(float v, float a, float b)
+    {
+        v = Math.Clamp(v, a, b);
+        return (v - a) / (b - a);
+    }
 
     public double Rand(double min, double max)
     {
@@ -43,7 +58,7 @@ public partial class MainWindow : Window
 
         var target = new WriteableBitmap(
             new PixelSize(_width, _height), 
-            new Vector(96, 96), 
+            new Vector(96, 96),
             PixelFormat.Rgba8888);
         using (var locked = target.Lock())
         {
@@ -73,15 +88,43 @@ public partial class MainWindow : Window
         var green = new SKPaint();
         green.Color = new SKColor(0, 255, 0);
 
-        var vertices = new Coordinate[_pcnt];
-        for (var i = 0; i < _pcnt; ++i)
+        var seed = (int) DateTime.Now.Ticks;
+        var noise = FastNoise.FromEncodedNodeTree(EncodedNoise);
+        
+        var vertices = new Coordinate[PointCount];
+        for (var i = 0; i < PointCount; ++i)
             vertices[i] = new Coordinate(Rand(0, _width), Rand(0, _height));
-        vertices = Relaxtion(vertices, 5);
+        vertices = Relaxtion(vertices, IterationCount);
+
         foreach (var cell in Voronoi(vertices))
         {
             var centroid = cell.Centroid.Coordinate;
-            canvas.DrawCircle((float) centroid.X, (float) centroid.Y, 2f, magenta);
+
             var pts = cell.Coordinates;
+
+            canvas.Save();
+            var path = new SKPath();
+            path.AddPoly(pts.Select(p => new SKPoint((float)p.X, (float)p.Y)).ToArray());
+            canvas.ClipPath(path);
+
+            var height = noise.GenSingle2D(((float) centroid.X - 1024) * Frequency, ((float) centroid.Y - 1024) * Frequency, seed);
+
+            var paint = new SKPaint();
+            
+            var val = Lerp(height, NoiseMin, NoiseMax);
+            if (val <= SeaLevel)
+            {
+                val += 0.3f;
+                paint.Color = new SKColor((byte)(150 * val), (byte)(150 * val), (byte)(255 * val));
+            }
+            else
+            {
+                paint.Color = new SKColor((byte)(255 * val), (byte)(255 * val), (byte)(255 * val));
+            }
+            canvas.DrawPaint(paint);
+            canvas.Restore();
+
+            canvas.DrawCircle((float) centroid.X, (float) centroid.Y, 2f, magenta);
             for (var i = 0; i < pts.Length; ++i)
                 canvas.DrawLine(
                     (float) pts[i].X, 

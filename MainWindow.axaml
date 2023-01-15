@@ -5,24 +5,38 @@
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="Procedural.MainWindow"
         Title="Procedural">
-    <Grid RowDefinitions="*,Auto,Auto">
-        <Image  Grid.Row="0" 
+    <Grid RowDefinitions="*,Auto" ColumnDefinitions="*,Auto" Margin="5">
+        <Image  Grid.Row="0" Grid.Column="0"
                 x:Name="CanvasUI" 
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"/>
-        <Button Grid.Row="1" 
+        <Button Grid.Row="1" Grid.Column="0" 
                 x:Name="RegenUI" 
                 Content="Regenerate"
                 Click="OnRegenerating" 
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Stretch"
-                HorizontalContentAlignment="Center"/>
-        <Button Grid.Row="2" 
-                x:Name="QuitUI" 
-                Content="Quit"
-                Click="OnQuit" 
-                HorizontalAlignment="Stretch"
-                VerticalAlignment="Stretch"
-                HorizontalContentAlignment="Center"/>
+                HorizontalContentAlignment="Center"
+				Margin="5"/>
+		
+		<StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Spacing="10">
+			<TextBlock Text="Point count"/>
+			<NumericUpDown Minimum="0" x:Name="CntUI" Value="5000"/>
+			
+			<TextBlock Text="Relaxtion iteration count"/>
+			<NumericUpDown Minimum="0" x:Name="IterUI" Value="3"/>
+			
+			<TextBlock Text="Frequency"/>
+			<NumericUpDown Minimum="0.1" x:Name="FreqUI" Increment="0.1" Value="0.4"/>
+			
+			<TextBlock Text="Noise Height Min"/>
+			<NumericUpDown x:Name="MinUI" Increment="0.1" Value="-0.8"/>
+			
+			<TextBlock Text="Noise Height Max"/>
+			<NumericUpDown x:Name="MaxUI" Increment="0.1" Value="1"/>
+
+			<TextBlock Text="Sea level"/>
+			<NumericUpDown x:Name="SeaUI" Increment="0.1" Value="0.5"/>
+		</StackPanel>
     </Grid>
 </Window>
